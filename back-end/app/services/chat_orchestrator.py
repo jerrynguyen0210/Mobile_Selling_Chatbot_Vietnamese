@@ -1,6 +1,7 @@
 """Central chat orchestrator: NLU → intent classification → handler routing → response."""
 
 import logging
+from typing import Any
 
 import redis.asyncio as aioredis
 from langchain_anthropic import ChatAnthropic
@@ -10,11 +11,12 @@ from langchain_core.messages import AIMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from sqlalchemy.ext.asyncio import AsyncSession
+from langchain_core.messages import HumanMessage
 
 from app.api.schemas.chat import ChatResponse, MessageRequest, SourceDocument
 from app.config import Settings
 from app.exceptions import LLMError
-from app.nlu import HANDLER_FOR, IntentClassifier, NLUResult, handle_unknown
+from app.nlu import HANDLER_FOR, IntentClassifier, NLUResult, handle_unknown, normalize
 
 logger = logging.getLogger(__name__)
 
@@ -74,8 +76,64 @@ def _get_session_history(session_id: str) -> InMemoryChatMessageHistory:
 
 
 def clear_session_history(session_id: str) -> None:
-    """Remove stored history for *session_id* (call on session expiry / logout)."""
+    """Remove stored history and memory for *session_id* (call on session expiry / logout)."""
     _session_histories.pop(session_id, None)
+    _session_memories.pop(session_id, None)
+
+
+# ---------------------------------------------------------------------------
+# Process-scoped session memory store
+#
+# Accumulates structured facts extracted from NLU entities across turns so
+# the LLM always has access to previously stated user preferences (budget,
+# brand, RAM, …) without re-reading the entire raw history.
+#
+# Keys are session_id strings; values are dicts of preference key → value.
+# ---------------------------------------------------------------------------
+
+# Entity keys from NLUResult that are worth remembering between turns.
+_MEMORY_ENTITY_KEYS: frozenset[str] = frozenset(
+    {
+        "brand",
+        "model",
+        "price_min",
+        "price_max",
+        "ram_gb",
+        "storage_gb",
+        "os",
+        "order_id",
+    }
+)
+
+_session_memories: dict[str, dict[str, Any]] = {}
+
+
+def _update_session_memory(session_id: str, entities: dict[str, Any]) -> None:
+    """Merge non-null NLU entities into the session memory store."""
+    mem = _session_memories.setdefault(session_id, {})
+    for key in _MEMORY_ENTITY_KEYS:
+        value = entities.get(key)
+        if value is not None:
+            mem[key] = value
+
+
+def _build_memory_context(session_id: str) -> str:
+    """Return a formatted string of remembered user preferences, or empty string."""
+    mem = _session_memories.get(session_id, {})
+    if not mem:
+        return ""
+    label_map = {
+        "brand": "Hãng ưa thích",
+        "model": "Dòng máy quan tâm",
+        "price_min": "Ngân sách từ",
+        "price_max": "Ngân sách đến",
+        "ram_gb": "RAM yêu cầu (GB)",
+        "storage_gb": "Bộ nhớ trong (GB)",
+        "os": "Hệ điều hành",
+        "order_id": "Mã đơn hàng",
+    }
+    lines = [f"- {label_map.get(k, k)}: {v}" for k, v in mem.items()]
+    return "Thông tin khách hàng đã chia sẻ trong phiên này:\n" + "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------
@@ -153,6 +211,16 @@ class ChatOrchestrator:
 
     async def process(self, request: MessageRequest) -> ChatResponse:
         """Run the full pipeline for one user turn and return the assistant reply."""
+        normalized = normalize(request.message)
+        if normalized != request.message:
+            logger.debug(
+                "session=%s message normalized: %r → %r",
+                request.session_id,
+                request.message,
+                normalized,
+            )
+            request = request.model_copy(update={"message": normalized})
+
         nlu = await self._classify_intent(request.message)
         logger.info(
             "session=%s intent=%s confidence=%.2f entities=%s",
@@ -161,6 +229,12 @@ class ChatOrchestrator:
             nlu.confidence,
             nlu.entities,
         )
+
+        # Persist any newly extracted entities into the session memory store
+        # so they can be recalled in subsequent turns without re-reading history.
+        if nlu.entities:
+            _update_session_memory(str(request.session_id), nlu.entities)
+
         return await self._route(request, nlu)
 
     # -------------------------------------------------------------------------
@@ -177,6 +251,7 @@ class ChatOrchestrator:
 
     async def _route(self, request: MessageRequest, nlu: NLUResult) -> ChatResponse:
         """Dispatch *request* to the handler that matches *nlu.intent*."""
+        logger.info("Routing session=%s intent=%s", request.session_id, nlu.intent)
         handler = HANDLER_FOR.get(nlu.intent, handle_unknown)
         return await handler(request, nlu, self._llm_reply, self._build_response)
 
@@ -200,11 +275,17 @@ class ChatOrchestrator:
 
         Returns ``(reply_text, usage_dict)``.
         """
-        content = (
-            f"[Thông tin ngữ cảnh]\n{extra_context}\n\n---\n\nKhách hàng: {user_message}"
-            if extra_context
-            else user_message
-        )
+        memory_context = _build_memory_context(session_id)
+        parts: list[str] = []
+        if memory_context:
+            parts.append(f"[Bộ nhớ phiên]\n{memory_context}")
+        if extra_context:
+            parts.append(f"[Thông tin ngữ cảnh]\n{extra_context}")
+        if parts:
+            preamble = "\n\n".join(parts)
+            content = f"{preamble}\n\n---\n\nKhách hàng: {user_message}"
+        else:
+            content = user_message
         try:
             ai_msg: AIMessage = await self._reply_chain.ainvoke(
                 {"system_prompt": system, "content": content},

@@ -138,7 +138,11 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- Backend URL (from environment variable, not hardcoded) ---
-BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
+# BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
+# -----------------------------------------------------------------------------
+# Frontend — Streamlit
+# -----------------------------------------------------------------------------
+BACKEND_URL="http://localhost:8000"
 
 
 # ---------------------------------------------------------------------------

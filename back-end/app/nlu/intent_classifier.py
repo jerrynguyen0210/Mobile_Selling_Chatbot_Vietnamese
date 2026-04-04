@@ -8,6 +8,7 @@ exactly one file: add to ``Intent``, write ``handle_<intent>``, register in
 import logging
 from collections.abc import Awaitable, Callable
 from enum import StrEnum
+from functools import lru_cache
 from typing import Any
 
 from langchain_core.language_models import BaseChatModel
@@ -15,6 +16,8 @@ from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel
 
 from app.api.schemas.chat import ChatResponse, MessageRequest
+from app.config import Settings, get_settings
+from app.rag.retriever import get_retriever
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +129,11 @@ class IntentClassifier:
 # ---------------------------------------------------------------------------
 
 
+@lru_cache(maxsize=1)
+def _get_product_search_settings() -> Settings:
+    return get_settings().model_copy(update={"retrieval_score_threshold": 0.3})
+
+
 async def handle_product_search(
     request: MessageRequest,
     nlu: NLUResult,
@@ -133,9 +141,12 @@ async def handle_product_search(
     build_response: BuildResponse,
 ) -> ChatResponse:
     # TODO: embed request.message → search Qdrant → inject top-K snippets as extra_context
-    entities_summary = ", ".join(f"{k}={v}" for k, v in nlu.entities.items())
-    extra = f"Tiêu chí tìm kiếm (trích từ NLU): {entities_summary}" if entities_summary else ""
-    content, usage = await llm_reply(str(request.session_id), request.message, extra_context=extra)
+    # entities_summary = ", ".join(f"{k}={v}" for k, v in nlu.entities.items())
+    # extra = f"Tiêu chí tìm kiếm (trích từ NLU): {entities_summary}" if entities_summary else ""
+    settings = _get_product_search_settings()
+    retriever = get_retriever(settings)
+    docs, context = await retriever.search_for_context(request.message, top_k=1)
+    content, usage = await llm_reply(str(request.session_id), request.message, extra_context=context)
     return build_response(request, content, usage)
 
 
@@ -146,7 +157,11 @@ async def handle_product_detail(
     build_response: BuildResponse,
 ) -> ChatResponse:
     # TODO: fetch product by nlu.entities.get("model") or "product_ids"[0] from DB/Qdrant
-    content, usage = await llm_reply(str(request.session_id), request.message)
+    settings = _get_product_search_settings()
+    retriever = get_retriever(settings)
+    docs = await retriever.search(request.message)
+    logger.info("Product detail search returned %d docs for query=%s", len(docs), docs[0])
+    content, usage = await llm_reply(str(request.session_id), request.message, extra_context=docs[0])
     return build_response(request, content, usage)
 
 

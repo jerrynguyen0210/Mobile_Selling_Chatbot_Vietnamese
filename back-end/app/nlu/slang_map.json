@@ -1,0 +1,72 @@
+{
+  "_comment": "Slang / abbreviation map for Vietnamese mobile-sales chatbot. Keys are lowercased abbreviated or colloquial forms; values are canonical Vietnamese. Multi-word keys (containing a space) are matched as full phrases before single-word tokens.",
+
+  "devices & brands": {
+    "dt":     "điện thoại",
+    "đt":     "điện thoại",
+    "dtdd":   "điện thoại di động",
+    "đtdđ":   "điện thoại di động",
+    "ip":     "iphone",
+    "iph":    "iphone",
+    "ss":     "samsung",
+    "xm":     "xiaomi"
+  },
+
+  "product attributes": {
+    "sp":     "sản phẩm",
+    "cam":    "camera",
+    "mh":     "màn hình",
+    "sac":    "sạc",
+    "bt":     "bluetooth"
+  },
+
+  "price & commerce": {
+    "ship":       "giao hàng",
+    "freeship":   "miễn phí giao hàng",
+    "cod":        "thanh toán khi nhận hàng",
+    "ck":         "chuyển khoản"
+  },
+
+  "general vietnamese slang": {
+    "ko":   "không",
+    "k":    "không",
+    "kg":   "không",
+    "dc":   "được",
+    "đc":   "được",
+    "bh":   "bây giờ",
+    "bn":   "bao nhiêu",
+    "tnx":  "cảm ơn",
+    "tks":  "cảm ơn",
+    "thx":  "cảm ơn",
+    "ok":   "được rồi",
+    "oke":  "được rồi",
+    "oce":  "được rồi"
+  },
+
+  "multi-word phrases": {
+    "bao nhieu":    "bao nhiêu",
+    "bao nhiu":     "bao nhiêu",
+    "dat hang":     "đặt hàng",
+    "dat mua":      "đặt mua",
+    "huy don":      "huỷ đơn",
+    "don hang":     "đơn hàng",
+    "giao hang":    "giao hàng",
+    "thanh toan":   "thanh toán",
+    "bao hanh":     "bảo hành",
+    "doi tra":      "đổi trả",
+    "man hinh":     "màn hình",
+    "bo nho":       "bộ nhớ",
+    "luu tru":      "lưu trữ",
+    "theo doi":     "theo dõi",
+    "tim kiem":     "tìm kiếm",
+    "so sanh":      "so sánh",
+    "gia ca":       "giá cả",
+    "gia tien":     "giá tiền",
+    "thong tin":    "thông tin",
+    "cam truoc":    "camera trước",
+    "cam sau":      "camera sau",
+    "sac nhanh":    "sạc nhanh",
+    "fast charge":  "sạc nhanh",
+    "khong day":    "không dây"
+  }
+}
