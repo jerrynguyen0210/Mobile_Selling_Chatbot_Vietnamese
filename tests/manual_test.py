@@ -6,7 +6,7 @@ from qdrant_client import QdrantClient, models
 from qdrant_client.http.exceptions import UnexpectedResponse
 from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
-from app.rag.retriever import ProductRetriever, SearchFilters, _parse_price_vnd
+from app.rag.retriever import ProductRetriever
 from app.config import Settings
 import asyncio
 
@@ -126,9 +126,6 @@ def debug_vector_search(text_query: str):
         # 4. Execute Search with Score Threshold
         print(f"\n[ACTION] Executing search (Limit: 5)...")
         
-        # Handling Named vs Unnamed vectors in the search call
-        query_input = QUERY_VECTOR if not VECTOR_NAME else (VECTOR_NAME, QUERY_VECTOR)
-
         results = client.query_points(
             collection_name=COLLECTION_NAME,
             query=QUERY_VECTOR,

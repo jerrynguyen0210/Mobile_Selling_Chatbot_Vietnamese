@@ -49,8 +49,8 @@ run-detach: ## Start all services in detached mode
 	docker compose up --build -d
 
 .PHONY: run-infra
-run-infra: ## Start only infrastructure (Postgres, Redis, Qdrant)
-	docker compose up postgres redis qdrant -d
+run-infra: ## Start only local infrastructure (Redis)
+	docker compose up redis -d
 
 .PHONY: run-backend
 run-backend: ## Run the FastAPI backend locally (requires infra running)
@@ -67,26 +67,6 @@ stop: ## Stop and remove all docker-compose containers
 .PHONY: stop-volumes
 stop-volumes: ## Stop containers AND remove all persistent volumes (destructive!)
 	docker compose down -v
-
-# ---------------------------------------------------------------------------
-# Database migrations (Alembic)
-# ---------------------------------------------------------------------------
-.PHONY: migrate
-migrate: ## Apply all pending Alembic migrations
-	alembic upgrade head
-
-.PHONY: migrate-create
-migrate-create: ## Create a new migration (usage: make migrate-create MSG="add products table")
-	@[ -n "$(MSG)" ] || (echo "$(BOLD)Usage: make migrate-create MSG=\"description\"$(RESET)" && exit 1)
-	alembic revision --autogenerate -m "$(MSG)"
-
-.PHONY: migrate-down
-migrate-down: ## Rollback the last migration
-	alembic downgrade -1
-
-.PHONY: migrate-history
-migrate-history: ## Show Alembic migration history
-	alembic history --verbose
 
 # ---------------------------------------------------------------------------
 # Data ingestion
@@ -154,10 +134,6 @@ logs-backend: ## Tail backend logs only
 .PHONY: shell-backend
 shell-backend: ## Open a shell in the backend container
 	docker compose exec backend /bin/bash
-
-.PHONY: shell-db
-shell-db: ## Open a psql shell in the Postgres container
-	docker compose exec postgres psql -U $${POSTGRES_USER:-chatbot} -d $${POSTGRES_DB:-chatbot}
 
 .PHONY: clean
 clean: ## Remove Python cache files and build artefacts

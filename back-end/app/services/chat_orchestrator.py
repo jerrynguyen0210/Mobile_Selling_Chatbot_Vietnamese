@@ -10,8 +10,6 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
-from sqlalchemy.ext.asyncio import AsyncSession
-from langchain_core.messages import HumanMessage
 
 from app.api.schemas.chat import ChatResponse, MessageRequest, SourceDocument
 from app.config import Settings
@@ -32,8 +30,7 @@ phục vụ thị trường Việt Nam.
 Nhiệm vụ:
 - Tư vấn sản phẩm phù hợp với nhu cầu và ngân sách khách hàng
 - Cung cấp thông tin chi tiết, chính xác về sản phẩm
-- Hỗ trợ đặt hàng, theo dõi và huỷ đơn
-- Trả lời câu hỏi về chính sách bảo hành, đổi trả, thanh toán, giao hàng
+- Hỗ trợ người dùng so sánh các lựa chọn trước khi mua
 
 Quy tắc:
 - Luôn trả lời bằng tiếng Việt trừ khi khách hàng dùng tiếng Anh
@@ -101,7 +98,6 @@ _MEMORY_ENTITY_KEYS: frozenset[str] = frozenset(
         "ram_gb",
         "storage_gb",
         "os",
-        "order_id",
     }
 )
 
@@ -130,7 +126,6 @@ def _build_memory_context(session_id: str) -> str:
         "ram_gb": "RAM yêu cầu (GB)",
         "storage_gb": "Bộ nhớ trong (GB)",
         "os": "Hệ điều hành",
-        "order_id": "Mã đơn hàng",
     }
     lines = [f"- {label_map.get(k, k)}: {v}" for k, v in mem.items()]
     return "Thông tin khách hàng đã chia sẻ trong phiên này:\n" + "\n".join(lines)
@@ -169,14 +164,12 @@ class ChatOrchestrator:
         self,
         settings: Settings,
         redis: aioredis.Redis | None = None,  # type: ignore[type-arg]
-        db: AsyncSession | None = None,
         *,
         nlu_llm: BaseChatModel | None = None,
         reply_llm: BaseChatModel | None = None,
     ) -> None:
         self._settings = settings
         self._redis = redis
-        self._db = db
 
         # ------------------------------------------------------------------
         # Resolve LLMs — caller may inject any BaseChatModel; default to
@@ -315,4 +308,3 @@ class ChatOrchestrator:
             model=self._settings.claude_model,
             usage=usage,
         )
-

@@ -1,3 +1,14 @@
 __pycache__/
+**/__pycache__/
+**/__pycache__/**
 *.pyc
 *.pyo
+
+# Ignore virtual environment directories
+/backend/
+.env
+.DS_Store
+.coverage
+coverage.*
+htmlcov/
+

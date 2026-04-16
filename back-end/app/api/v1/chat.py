@@ -14,7 +14,7 @@ from app.api.schemas.chat import (
     SessionCreate,
     SessionResponse,
 )
-from app.dependencies import AppSettings, DBSession, RedisClient
+from app.dependencies import AppSettings, RedisClient
 from app.services import ChatOrchestrator
 
 logger = logging.getLogger(__name__)
@@ -35,7 +35,6 @@ router = APIRouter(tags=["chat"])
 )
 async def create_session(
     body: SessionCreate,
-    db: DBSession,
     redis: RedisClient,
     settings: AppSettings,
 ) -> SessionResponse:
@@ -57,7 +56,7 @@ async def create_session(
         )
         await redis.expire(key, settings.session_ttl)
 
-    # TODO: persist to PostgreSQL sessions table once ORM models are in place
+    # TODO: persist to long-term storage once ORM models are in place
     logger.info("Created session %s (user=%s)", session.session_id, session.user_id)
     return session
 
@@ -74,7 +73,6 @@ async def create_session(
 )
 async def send_message(
     body: MessageRequest,
-    db: DBSession,
     redis: RedisClient,
     settings: AppSettings,
 ) -> ChatResponse:
@@ -97,7 +95,7 @@ async def send_message(
             )
 
     logger.info("Message received for session %s", body.session_id)
-    orchestrator = ChatOrchestrator(settings=settings, redis=redis, db=db)
+    orchestrator = ChatOrchestrator(settings=settings, redis=redis)
     return await orchestrator.process(body)
 
 
@@ -113,7 +111,6 @@ async def send_message(
 )
 async def get_history(
     session_id: UUID,
-    db: DBSession,
     settings: AppSettings,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=200),

@@ -1,133 +1,121 @@
-# 📱 Mobile Selling Chatbot Vietnamese
+# Mobile Selling Chatbot (Vietnamese)
 
-An AI-powered mobile phone selling chatbot for the Vietnamese market. Customers can browse phones by brand or price range, ask feature-specific questions (battery, camera, performance), and receive product recommendations in Vietnamese — backed by a RAG pipeline that retrieves relevant products from a vector store before generating responses with Claude.
+AI-powered chatbot for mobile phone sales in the Vietnamese market.
 
----
+Users can:
+- Browse phones by brand or price range
+- Ask feature-based questions (battery, camera, performance)
+- Get Vietnamese recommendations backed by a RAG pipeline
+
+The system retrieves relevant products from Qdrant, then generates final responses with Claude.
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │                        User (Browser)                           │
 └──────────────────────────────┬──────────────────────────────────┘
                                │ HTTP
 ┌──────────────────────────────▼──────────────────────────────────┐
-│               Frontend  (Streamlit · port 8501)                 │
-│  • Chat UI with user/bot message bubbles                        │
-│  • Sidebar: brand categories + price-range slider               │
+│               Frontend (Streamlit · port 8501)                  │
+│  • Chat UI with user/bot bubbles                                │
+│  • Sidebar with brand categories + price slider                 │
 │  • Quick-reply suggestions                                      │
-│  • Falls back to local mock responses when backend is offline   │
+│  • Local mock fallback if backend is offline                    │
 └──────────────────────────────┬──────────────────────────────────┘
-                               │ POST /chat  (JSON)
+                               │ POST /chat (JSON)
 ┌──────────────────────────────▼──────────────────────────────────┐
-│               Backend API  (FastAPI · port 8000)                │
-│                                                                 │
-│  POST /chat ──► 1. Embed user query (sentence-transformers)     │
-│                 2. Retrieve top-k products  ──► Qdrant          │
-│                 3. Build prompt with context                    │
-│                 4. Generate reply  ──────────► Claude API       │
-│                 5. Persist conversation ─────► PostgreSQL       │
-│                 6. Cache session ────────────► Redis            │
+│               Backend API (FastAPI · port 8000)                 │
+│  1) Embed user query (sentence-transformers)                    │
+│  2) Retrieve top-k products from Qdrant                         │
+│  3) Build prompt with retrieved context                         │
+│  4) Generate response via Claude API                            │
+│  5) Cache session state in Redis                                │
 └──────────────┬───────────────┬───────────────┬─────────────────┘
                │               │               │
-    ┌──────────▼──┐   ┌────────▼──────┐  ┌────▼──────────┐
-    │  PostgreSQL  │   │    Qdrant     │  │     Redis     │
-    │  (port 5432) │   │  (port 6333)  │  │  (port 6379)  │
-    │  Conversations│  │  Product      │  │  Session      │
-    │  & products  │   │  embeddings   │  │  cache & TTL  │
-    └─────────────┘   └───────────────┘  └───────────────┘
+    ┌──────────────────┐   ┌───────────────┐
+    │   Qdrant Cloud   │   │     Redis     │
+    │ (managed remote) │   │ (port 6379)   │
+    │ Product vectors  │   │ Session cache │
+    └──────────────────┘   └───────────────┘
 ```
 
-### Key design decisions
+### Key Design Decisions
 
-| Concern | Choice | Why |
+| Concern | Choice | Rationale |
 |---|---|---|
-| LLM | Claude (Anthropic) | Best-in-class Vietnamese language quality |
-| Vector store | Qdrant | Fast ANN search, easy Docker deployment |
-| Embeddings | `paraphrase-multilingual-MiniLM-L12-v2` | Good Vietnamese coverage, runs on CPU |
-| Relational DB | PostgreSQL | Conversation history, product catalogue |
-| Cache | Redis | Session state, TTL-based expiry |
-| Frontend | Streamlit | Rapid iteration, no JS required |
-| API | FastAPI | Async, auto-generated OpenAPI docs |
+| LLM | Claude (Anthropic) | Strong Vietnamese language quality |
+| Vector store | Qdrant | Fast ANN search, easy local + cloud usage |
+| Embeddings | `intfloat/multilingual-e5-base` | High multilingual retrieval quality (768-d) |
+| Cache | Redis | Session storage with TTL support |
+| Frontend | Streamlit | Rapid prototyping without frontend JS |
+| API | FastAPI | Async-first with built-in OpenAPI docs |
 
----
-
-## Quick start
+## Quick Start
 
 ### Prerequisites
 
-- Docker & Docker Compose v2
-- An [Anthropic API key](https://console.anthropic.com/)
+- Docker + Docker Compose v2
+- [Anthropic API key](https://console.anthropic.com/)
 
-### 1. Clone & configure
+### 1. Clone and configure
 
 ```bash
 git clone <repo-url>
 cd Mobile_Selling_Chatbot_Vietnamese
 
-# Creates .env from the template
 make env
-# → open .env and set ANTHROPIC_API_KEY (and any other secrets you want to change)
+# Then edit .env and set ANTHROPIC_API_KEY (and other secrets as needed)
 ```
 
-### 2. Start all services
+### 2. Start the stack
 
 ```bash
 make run
-# or in detached mode:
+# or:
 make run-detach
 ```
 
-This starts: **PostgreSQL · Redis · Qdrant · Backend (FastAPI) · Frontend (Streamlit)**
+Services started: Redis, Qdrant, FastAPI backend, and Streamlit frontend.
 
-### 3. Apply database migrations
-
-```bash
-make migrate
-```
-
-### 4. Ingest product catalogue
+### 3. Ingest product data
 
 ```bash
 make ingest
-# Reads PRODUCT_DATA_PATH (default: data/products.json) and upserts
-# product embeddings into Qdrant.
+# Reads PRODUCT_DATA_PATH (default: data/products.json)
+# and upserts embeddings into Qdrant
 ```
 
-### 5. Open the app
+### 4. Open the app
 
 | Service | URL |
 |---|---|
 | Chatbot UI | http://localhost:8501 |
 | Backend API | http://localhost:8000 |
 | API docs (Swagger) | http://localhost:8000/docs |
-| Qdrant dashboard | http://localhost:6333/dashboard |
+| Qdrant dashboard | Your Qdrant Cloud console URL |
 
----
-
-## Local development (without Docker)
+## Local Development (Without Docker App Services)
 
 ```bash
-# Install Python dependencies (requires Python 3.11+)
+# Python 3.11+
 make install
 
-# Start only the infrastructure containers
+# Start infrastructure only (e.g., Redis/Qdrant)
 make run-infra
 
-# Run backend + frontend in separate terminals
-make run-backend   # terminal 1 — FastAPI on :8000
-make run-frontend  # terminal 2 — Streamlit on :8501
+# In separate terminals:
+make run-backend   # FastAPI on :8000
+make run-frontend  # Streamlit on :8501
 ```
 
----
-
-## API reference
+## API Reference
 
 ### `POST /chat`
 
-Send a user message and receive a bot reply.
+Sends a user message and returns a chatbot response.
 
-**Request body**
+Request body:
 
 ```json
 {
@@ -139,9 +127,9 @@ Send a user message and receive a bot reply.
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `message` | string | yes | User message in Vietnamese |
-| `session_id` | string | yes | Unique identifier for the conversation session |
+| `session_id` | string | yes | Unique conversation session ID |
 
-**Response (200)**
+Response (`200`):
 
 ```json
 {
@@ -152,31 +140,27 @@ Send a user message and receive a bot reply.
 
 | Field | Type | Description |
 |---|---|---|
-| `reply` | string | Bot response in Vietnamese (may include Markdown) |
-| `session_id` | string | Echo of the request session ID |
+| `reply` | string | Vietnamese bot reply (may include Markdown) |
+| `session_id` | string | Echoed session ID |
 
-**Error responses**
+Error responses:
 
 | Status | Meaning |
 |---|---|
-| 422 | Validation error — check request body |
-| 500 | Internal server error (check backend logs) |
-
----
+| `422` | Validation error in request body |
+| `500` | Internal server error (check backend logs) |
 
 ### `GET /health`
 
-Returns service health status.
+Returns health status:
 
 ```json
 { "status": "ok" }
 ```
 
----
+## Project Structure
 
-## Project structure
-
-```
+```text
 Mobile_Selling_Chatbot_Vietnamese/
 ├── back-end/
 │   ├── app/
@@ -195,7 +179,7 @@ Mobile_Selling_Chatbot_Vietnamese/
 │   │       └── deps.py       # FastAPI dependency injection
 │   ├── migrations/           # Alembic migration scripts
 │   ├── scripts/
-│   │   └── ingest.py         # Product catalogue → Qdrant ingestion script
+│   │   └── ingest.py         # Product catalogue -> Qdrant ingestion script
 │   ├── Dockerfile
 │   └── tests/
 │       ├── unit/
@@ -204,87 +188,114 @@ Mobile_Selling_Chatbot_Vietnamese/
 │   ├── chatting_bot.py       # Streamlit chat application
 │   └── Dockerfile
 ├── data/
-│   └── products.json         # Product catalogue (source of truth for ingestion)
+│   └── products.json         # Source-of-truth product catalogue
 ├── tests/                    # Root-level test entry point
 ├── pyproject.toml            # Dependencies + ruff + pytest config
 ├── docker-compose.yml        # Full local dev stack
-├── alembic.ini               # Alembic migration config
 ├── Makefile                  # Developer commands
 ├── .env.example              # Environment variable template
 └── README.md
 ```
 
----
-
-## Common commands
+## Common Commands
 
 ```bash
-make help              # list all available commands
+make help              # list all commands
 
 # Development
-make run               # start everything via docker-compose
-make run-backend       # FastAPI only (local)
-make run-frontend      # Streamlit only (local)
+make run               # start full stack via docker-compose
+make run-backend       # backend only (local)
+make run-frontend      # frontend only (local)
 make stop              # stop all containers
-
-# Database
-make migrate                          # apply pending migrations
-make migrate-create MSG="add table"   # generate new migration
-make migrate-down                     # roll back last migration
 
 # Data
 make ingest            # ingest products into Qdrant
 
 # Quality
-make test              # pytest with coverage
+make test              # run pytest with coverage
 make lint              # ruff check
 make lint-fix          # ruff check --fix
 make format            # ruff format
 make check             # lint + typecheck
 
 # Utilities
-make logs              # tail all container logs
-make shell-db          # psql into Postgres
-make clean             # remove cache / build artefacts
+make logs              # tail container logs
+make clean             # remove build/cache artifacts
 ```
 
----
+## Environment Variables
 
-## Environment variables
+See [.env.example](.env.example) for the full list and descriptions.
 
-See [.env.example](.env.example) for the full list with descriptions.
-
-The most important ones to set before starting:
+Most important before startup:
 
 | Variable | Description |
 |---|---|
-| `ANTHROPIC_API_KEY` | Anthropic API key for Claude |
-| `POSTGRES_PASSWORD` | Postgres password (also update `DATABASE_URL`) |
+| `ANTHROPIC_API_KEY` | Anthropic API key used by Claude |
 | `REDIS_PASSWORD` | Redis password (also update `REDIS_URL`) |
 | `QDRANT_API_KEY` | Qdrant service API key |
 | `SECRET_KEY` | 64-character hex string for token signing |
 
----
-
 ## Contributing
 
-1. Create a feature branch from `main`
-2. Run `make install` to set up the dev environment
-3. Make your changes, add tests
-4. Run `make check && make test` — all checks must pass
-5. Open a pull request
+1. Create a feature branch from `main`.
+2. Run `make install`.
+3. Implement your changes and add tests.
+4. Run `make check && make test`.
+5. Open a pull request.
 
----
+## Docker Image Workflow (Optional)
+
+Tag and push images:
+
+```bash
+docker tag mobile_selling_chatbot_vietnamese-backend jerrynguyen0210/chatbot-backend:latest
+docker tag mobile_selling_chatbot_vietnamese-frontend jerrynguyen0210/chatbot-frontend:latest
+
+docker push jerrynguyen0210/chatbot-backend:latest
+docker push jerrynguyen0210/chatbot-frontend:latest
+```
+
+Pull images:
+
+```bash
+docker pull jerrynguyen0210/chatbot-backend:latest
+docker pull jerrynguyen0210/chatbot-frontend:latest
+```
+
+Run with host-based backend URL:
+
+```bash
+docker run -d --name chatbot_backend \
+  -p 8000:8000 \
+  --env-file ./.env \
+  jerrynguyen0210/chatbot-backend:latest
+
+docker run -d --name chatbot_frontend \
+  --network chatbot_net \
+  -p 8601:8501 \
+  -e BACKEND_URL=http://localhost:8000 \
+  jerrynguyen0210/chatbot-frontend:latest
+```
+
+Run both containers on a shared Docker network:
+
+```bash
+docker network create chatbot_net
+
+docker run -d --name chatbot_backend \
+  --network chatbot_net \
+  -p 8000:8000 \
+  --env-file .env \
+  jerrynguyen0210/chatbot-backend:latest
+
+docker run -d --name chatbot_frontend \
+  --network chatbot_net \
+  -p 8501:8501 \
+  -e BACKEND_URL=http://chatbot_backend:8000 \
+  jerrynguyen0210/chatbot-frontend:latest
+```
 
 ## License
 
 MIT
-
-from qdrant_client import QdrantClient
-
-qdrant_client = QdrantClient(
-    url="https://f29ac8e3-3a08-4868-a52e-56165187b7ae.eu-west-2-0.aws.cloud.qdrant.io:6333", 
-    api_key="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0._vxdwuwD54vrv2AmTXnvbkDBP3JqBONluDq9QCqMBUA",
-)
-
-print(qdrant_client.get_collections())

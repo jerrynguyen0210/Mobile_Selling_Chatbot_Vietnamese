@@ -36,7 +36,7 @@ QDRANT_API_KEY    = os.getenv("QDRANT_API_KEY") or os.getenv("QDRANT_API_KEY")
 COLLECTION_NAME   = os.getenv("QDRANT_COLLECTION", "mobile_products")
 EMBEDDING_MODEL   = os.getenv(
     "EMBEDDING_MODEL",
-    "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    "intfloat/multilingual-e5-base",
 )
 BATCH_SIZE        = int(os.getenv("INGEST_BATCH_SIZE", "50"))
 

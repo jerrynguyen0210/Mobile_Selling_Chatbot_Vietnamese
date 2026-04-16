@@ -4,6 +4,7 @@ All settings are read from environment variables (or a .env file).
 """
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field, field_validator
@@ -12,7 +13,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        # Single source of truth: repo-root .env
+        env_file=str(Path(__file__).resolve().parents[2] / ".env"),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -27,17 +29,6 @@ class Settings(BaseSettings):
         description="Claude model ID used for chat completions",
     )
     claude_max_tokens: int = Field(default=1024, ge=1, le=8192)
-
-    # -------------------------------------------------------------------------
-    # Database — PostgreSQL
-    # -------------------------------------------------------------------------
-    database_url: str = Field(
-        default="postgresql://chatbot:chatbot_secret@localhost:5432/chatbot",
-        description="SQLAlchemy-compatible PostgreSQL connection URL",
-    )
-    db_pool_size: int = Field(default=10, ge=1)
-    db_max_overflow: int = Field(default=20, ge=0)
-    db_pool_timeout: int = Field(default=30, ge=1)
 
     # -------------------------------------------------------------------------
     # Cache — Redis
@@ -59,7 +50,7 @@ class Settings(BaseSettings):
     # Embeddings
     # -------------------------------------------------------------------------
     embedding_model: str = Field(
-        default="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+        default="intfloat/multilingual-e5-base"
     )
     retrieval_top_k: int = Field(default=5, ge=1, le=50)
     retrieval_score_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
@@ -80,7 +71,7 @@ class Settings(BaseSettings):
     # -------------------------------------------------------------------------
     enable_rag: bool = Field(default=True, description="Enable RAG pipeline")
     enable_conversation_history: bool = Field(
-        default=True, description="Persist conversation turns to PostgreSQL"
+        default=True, description="Enable conversation history endpoint"
     )
     enable_cache: bool = Field(default=True, description="Use Redis response cache")
 

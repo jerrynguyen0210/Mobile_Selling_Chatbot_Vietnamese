@@ -6,13 +6,12 @@ from fastapi import APIRouter, HTTPException, status
 
 from app.api.schemas.product import (
     CompareRequest,
-    ProductCard,
     ProductCompare,
     ProductDetail,
     ProductSearchResponse,
     SearchFilters,
 )
-from app.dependencies import AppSettings, DBSession
+from app.dependencies import AppSettings
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +30,6 @@ router = APIRouter(tags=["products"])
 )
 async def search_products(
     filters: SearchFilters,
-    db: DBSession,
     settings: AppSettings,
 ) -> ProductSearchResponse:
     """
@@ -68,7 +66,6 @@ async def search_products(
 )
 async def get_product(
     product_id: str,
-    db: DBSession,
 ) -> ProductDetail:
     """
     Fetches complete product information including full specs, description,
@@ -94,7 +91,6 @@ async def get_product(
 )
 async def compare_products(
     body: CompareRequest,
-    db: DBSession,
 ) -> ProductCompare:
     """
     Fetches the requested products and builds a structured comparison table

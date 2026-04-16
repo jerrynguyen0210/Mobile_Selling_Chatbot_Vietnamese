@@ -51,13 +51,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if _redis_client is not None:
         await _redis_client.aclose()
 
-    # Dispose SQLAlchemy engine if it was created
-    from app.dependencies import _async_engine  # noqa: PLC0415
-
-    if _async_engine is not None:
-        await _async_engine.dispose()
-
-
 # ---------------------------------------------------------------------------
 # App factory
 # ---------------------------------------------------------------------------

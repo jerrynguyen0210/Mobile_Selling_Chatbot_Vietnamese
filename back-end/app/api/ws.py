@@ -6,7 +6,7 @@ import logging
 from enum import StrEnum
 from uuid import UUID
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, ValidationError
 
 from app.config import get_settings
@@ -100,7 +100,6 @@ async def _stream_llm_response(session_id: UUID, user_text: str) -> str:
     call once the service layer is wired up.  Each yielded chunk is sent to the
     client as a ``ServerEventType.CHUNK`` frame.
     """
-    settings = get_settings()
     sid = str(session_id)
 
     # Typing indicator → on
